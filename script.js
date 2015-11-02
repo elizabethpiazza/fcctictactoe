@@ -93,8 +93,16 @@ function Board () {
 		return squares[squareIndex].squareValue;
 	};
 
+	this.emptySquares = function() {
+		var empty = new Array();
+		for (var i = 0; i < (SIZE * SIZE); i++) {
+			if (squares[i].isEmpty()) { empty.push(i); }
+		}
+		return empty;
+	}
+
 	this.isAllFilledIn = function() {
-		for (var i = 1; i < SIZE * SIZE; i++) {
+		for (var i = 0; i < (SIZE * SIZE); i++) {
 			if(squares[i].isEmpty()) { return false; }
 		}
 		return true;
@@ -138,6 +146,48 @@ function Player(symbol) {
 	};
 }
 
+function Computer(symbol) {
+	Player.call(this, symbol)
+}
+
+Computer.prototype = Object.create(Player.prototype);
+
+Computer.prototype.winningCombos = {
+	0: [6, 72, 272],
+	1: [5, 144],
+	2: [3, 288, 80],
+	3: [48, 65],
+	4: [40, 130, 257, 68],
+	5: [24, 260],
+	6: [384, 9, 20],
+	7: [320, 18],
+	8: [192, 36, 17]
+}
+
+Computer.prototype.tryToWin = function(emptySquares){
+	for (var i = 0; i < emptySquares.length; i++){
+		var combos = this.winningCombos[emptySquares[i]];
+		for (var j = 0; j < combos.length; j++){
+			if ((combos[j] & this.score) === combos[j]){
+				return emptySquares[i];
+			}
+		}
+	}
+	return -1;
+}
+
+Computer.prototype.preventLoss = function(emptySquares, otherPlayerScore){
+	for (var i = 0; i < emptySquares.length; i++){
+		var combos = this.winningCombos[emptySquares[i]];
+		for (var j = 0; j < combos.length; j++){
+			if ((combos[j] & otherPlayerScore) === combos[j]){
+				return emptySquares[i];
+			}
+		}
+	}
+	return -1;
+}
+
 function Game() {
 	"use strict";
 
@@ -155,12 +205,11 @@ function Game() {
 		theBoard = new Board();
 		theBoard.resetSquares();
 		playerX = new Player('X');
-		playerO = new Player('O');
+		playerO = new Computer('O');
 		currentPlayer = playerX;
 		playerX.resetScore();
 		playerO.resetScore();
 		gameEnded = false;
-		console.log('started');
 	}
 
 	this.takeaTurn = function(squareIndex) {
@@ -179,9 +228,10 @@ function Game() {
 					gameEnded = true;
 				} else {
 					currentPlayer == playerX ? currentPlayer = playerO : currentPlayer = playerX;
+					if (currentPlayer == playerO) { this.handToComputer(); }
 				}
 			}
-			}
+		}
 	};
 
 	this.isTie = function() {
@@ -193,7 +243,19 @@ function Game() {
 		return false;
 	};
 
-	//find out how these work
+	this.handToComputer = function() {
+		//see if i can win
+		var bestTurn = -1;
+		var arrayofEmpties = theBoard.emptySquares();
+		if ((bestTurn = playerO.tryToWin(arrayofEmpties)) != -1) {
+			this.takeaTurn(bestTurn);
+		} else if ((bestTurn = playerO.preventLoss(arrayofEmpties, playerX.playerScore)) != -1) {
+			this.takeaTurn(bestTurn);
+		} else {
+			this.takeaTurn(arrayofEmpties[0]);
+		}
+	};
+
 	this.restartGame = function() {
 		location.reload();
 	};
@@ -219,7 +281,6 @@ $(document).ready(function Gui() {
 
 	GRID_NAMESPACE.handleClickedOn = function() {
 		var index = $(this).attr('id');
-		console.log(index);
 		theGame.takeaTurn(index);
 	};
 	GRID_NAMESPACE.handleRestartButtonClicked = function() {
@@ -236,7 +297,6 @@ $(document).ready(function Gui() {
 	};
 	GRID_NAMESPACE.addHandlers = function() {
 		$('td').click(function() {
-			console.log('clicked');
 			GRID_NAMESPACE.handleClickedOn.call(this);
 		});
 		$('button').click(function() {
